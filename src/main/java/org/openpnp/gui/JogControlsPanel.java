@@ -29,12 +29,14 @@ import java.awt.event.ActionEvent;
 import java.beans.PropertyChangeListener;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Map;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
@@ -45,10 +47,14 @@ import javax.swing.event.ChangeListener;
 
 import org.openpnp.ConfigurationListener;
 import org.openpnp.gui.support.Icons;
+import org.openpnp.model.Board;
+import org.openpnp.model.BoardLocation;
 import org.openpnp.model.Configuration;
+import org.openpnp.model.Job;
 import org.openpnp.model.Length;
 import org.openpnp.model.LengthUnit;
 import org.openpnp.model.Location;
+import org.openpnp.model.Point;
 import org.openpnp.spi.Actuator;
 import org.openpnp.spi.Head;
 import org.openpnp.spi.HeadMountable;
@@ -191,9 +197,39 @@ public class JogControlsPanel extends JPanel {
             else if (c < 0) {
                 cPos -= jogIncrement;
             }
+            
+            /* check board location before movement */
+            Location targetLocation = new Location(l.getUnits(), xPos, yPos, zPos, cPos);
+        	List<BoardLocation> boardLocations = machineControlsPanel.getJobPanel().getJob().getBoardLocations();
+            for (BoardLocation boardLocation: boardLocations) {
+            	if (!boardLocation.isEnabled()) {
+            		continue;
+            	}
+            	boolean safe = nozzleLocationIsSafe(boardLocation.getLocation(), boardLocation.getBoard().getDimensions(), targetLocation, new Length(5.0, l.getUnits()));
+            	if (!safe) {
+        			throw new Error("Z Axis would move against " + boardLocation.toString());
+        		}
+            }
 
-            tool.moveTo(new Location(l.getUnits(), xPos, yPos, zPos, cPos));
+            machineControlsPanel.getSelectedNozzle()
+                    .moveTo(targetLocation);
         });
+    }
+    
+    private boolean nozzleLocationIsSafe(Location origin, Location dimension, Location nozzle, Length safeDistance) {
+    	double distance = safeDistance.convertToUnits(nozzle.getUnits()).getValue();
+    	double x = nozzle.getX();
+    	double y = nozzle.getY();
+    	Location originConverted = origin.convertToUnits(nozzle.getUnits());
+    	double x1 = originConverted.getX();
+    	double y1 = originConverted.getY();
+    	Location dimensionConverted = dimension.convertToUnits(dimension.getUnits());
+    	double x2 = x1 + dimensionConverted.getX();
+    	double y2 = y1 + dimensionConverted.getY();
+    	double boardUpperZ = originConverted.getZ() + dimensionConverted.getZ();
+    	boolean containsXY = (x > (x1 - distance)) && (x < (x2 + distance)) && (y > (y1 - distance)) && (y < (y2 + distance));
+    	boolean containsZ = nozzle.getZ() <= (boardUpperZ + distance);
+    	return !(containsXY && containsZ);
     }
 
     private void park(boolean xy, boolean z, boolean c) {
@@ -231,6 +267,7 @@ public class JogControlsPanel extends JPanel {
                         FormSpecs.RELATED_GAP_COLSPEC, FormSpecs.DEFAULT_COLSPEC,
                         FormSpecs.RELATED_GAP_COLSPEC, FormSpecs.DEFAULT_COLSPEC,
                         FormSpecs.RELATED_GAP_COLSPEC, FormSpecs.DEFAULT_COLSPEC,
+                        FormSpecs.RELATED_GAP_COLSPEC, FormSpecs.DEFAULT_COLSPEC,
                         FormSpecs.RELATED_GAP_COLSPEC, FormSpecs.DEFAULT_COLSPEC,},
                 new RowSpec[] {FormSpecs.RELATED_GAP_ROWSPEC, FormSpecs.DEFAULT_ROWSPEC,
                         FormSpecs.RELATED_GAP_ROWSPEC, FormSpecs.DEFAULT_ROWSPEC,
@@ -246,6 +283,9 @@ public class JogControlsPanel extends JPanel {
         homeButton.setIcon(Icons.home);
         homeButton.setHideActionText(true);
         panelControls.add(homeButton, "2, 2");
+        
+        JCheckBox boardProtectionOverrideCheck = new JCheckBox("Override Board Protection");
+        panelControls.add(boardProtectionOverrideCheck, "24, 2");
 
         JLabel lblXy = new JLabel("X/Y");
         lblXy.setFont(new Font("Lucida Grande", Font.PLAIN, 22));
