@@ -224,6 +224,7 @@ public class JogControlsPanel extends JPanel {
     	double x1 = originConverted.getX();
     	double y1 = originConverted.getY();
     	Location dimensionConverted = dimension.convertToUnits(dimension.getUnits());
+    	dimensionConverted = dimensionConverted.rotateXy(dimensionConverted.getRotation());
     	double x2 = x1 + dimensionConverted.getX();
     	double y2 = y1 + dimensionConverted.getY();
     	double boardUpperZ = originConverted.getZ() + dimensionConverted.getZ();
