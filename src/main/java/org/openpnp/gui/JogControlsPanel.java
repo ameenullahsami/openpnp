@@ -211,8 +211,7 @@ public class JogControlsPanel extends JPanel {
         		}
             }
 
-            machineControlsPanel.getSelectedNozzle()
-                    .moveTo(targetLocation);
+            tool.moveTo(targetLocation);
         });
     }
     
